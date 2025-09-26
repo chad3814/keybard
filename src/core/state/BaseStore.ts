@@ -19,19 +19,10 @@ export interface HistoryEntry<T> {
  * Abstract base class for MobX stores
  */
 export abstract class BaseStore<T extends StoreState = StoreState> {
-  @observable
   protected state: T;
-
-  @observable
   protected history: HistoryEntry<T>[] = [];
-
-  @observable
   protected historyIndex = -1;
-
-  @observable
   protected maxHistorySize = 50;
-
-  @observable
   public isDirty = false;
 
   protected eventBus: EventBus;

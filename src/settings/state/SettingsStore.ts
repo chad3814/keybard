@@ -33,11 +33,11 @@ export class SettingsStore extends BaseStore<SettingsState> {
     );
 
     makeObservable(this, {
-      settings: observable,
-      committedSettings: observable,
-      instantMode: observable,
-      loading: observable,
-      error: observable,
+      settings: computed,
+      committedSettings: computed,
+      instantMode: computed,
+      loading: computed,
+      error: computed,
       hasChanges: computed,
       changedSettings: computed,
       setLoading: action,
@@ -53,7 +53,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Get settings (for convenience)
    */
-  @computed
   public get settings(): Record<string, QMKSetting> {
     return this.state.settings;
   }
@@ -61,7 +60,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Get committed settings
    */
-  @computed
   public get committedSettings(): Record<string, QMKSetting> {
     return this.state.committedSettings;
   }
@@ -69,7 +67,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Check if instant mode is enabled
    */
-  @computed
   public get instantMode(): boolean {
     return this.state.instantMode;
   }
@@ -77,7 +74,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Check if loading
    */
-  @computed
   public get loading(): boolean {
     return this.state.loading;
   }
@@ -85,7 +81,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Get error message
    */
-  @computed
   public get error(): string | null {
     return this.state.error;
   }
@@ -93,7 +88,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Check if there are uncommitted changes
    */
-  @computed
   public get hasChanges(): boolean {
     const current = this.state.settings;
     const committed = this.state.committedSettings;
@@ -111,7 +105,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Get list of changed settings
    */
-  @computed
   public get changedSettings(): string[] {
     const changed: string[] = [];
     const current = this.state.settings;
@@ -129,7 +122,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Set loading state
    */
-  @action
   public setLoading(loading: boolean): void {
     this.setState({ loading }, 'setLoading');
   }
@@ -137,7 +129,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Set error message
    */
-  @action
   public setError(error: string | null): void {
     this.setState({ error }, 'setError');
   }
@@ -145,7 +136,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Update a single setting value
    */
-  @action
   public setSetting(id: string, value: number | boolean): Result<void, string> {
     const setting = this.state.settings[id];
 
@@ -196,7 +186,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Bulk update settings
    */
-  @action
   public setSettings(settings: Record<string, QMKSetting>): void {
     this.setState(
       {
@@ -210,7 +199,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Commit current settings
    */
-  @action
   public commitSettings(): void {
     this.setState(
       {
@@ -225,7 +213,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Revert to committed settings
    */
-  @action
   public revertSettings(): void {
     this.setState(
       {
@@ -238,7 +225,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Toggle instant mode
    */
-  @action
   public toggleInstantMode(): void {
     this.setState(
       {
@@ -251,7 +237,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Load settings (placeholder for USB integration)
    */
-  @action
   public async loadSettings(): Promise<Result<void, string>> {
     this.setLoading(true);
     this.setError(null);
@@ -325,7 +310,6 @@ export class SettingsStore extends BaseStore<SettingsState> {
   /**
    * Save settings (placeholder for USB integration)
    */
-  @action
   public async saveSettings(): Promise<Result<void, string>> {
     if (!this.hasChanges && !this.state.instantMode) {
       return ok(undefined);

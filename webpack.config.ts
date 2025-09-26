@@ -63,7 +63,7 @@ const config = (env: any, argv: { mode: string }): Configuration => {
         directory: path.join(__dirname, 'public'),
       },
       compress: true,
-      port: 3000,
+      port: 8080,
       hot: true,
       open: true,
       historyApiFallback: true,

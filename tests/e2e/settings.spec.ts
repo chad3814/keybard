@@ -5,71 +5,161 @@ class SettingsPage {
 
   async open() {
     await this.page.goto('/');
-    // Wait for the main board to load
-    await this.page.waitForSelector('#mainboard', { timeout: 10000 });
+    // Wait for the app to load
+    await this.page.waitForSelector('.keybard-app', { timeout: 10000 });
+    // Wait for connection status component
+    await this.page.waitForSelector('connection-status', { timeout: 10000 });
   }
 
-  async openSettingsMenu() {
-    // Click the menu button (usually labeled "MENU" or has settings icon)
-    const menuButton = this.page.locator('button:has-text("MENU"), #menu-button, .menu-trigger').first();
-    await menuButton.click();
-
-    // Wait for settings panel to be visible
-    await this.page.waitForSelector('#menu-content, .settings-panel', { state: 'visible' });
+  async connectDevice() {
+    // Click connect button
+    const connectButton = this.page.locator('button.btn-connect');
+    if (await connectButton.isVisible()) {
+      await connectButton.click();
+      // In tests, we'll mock the USB device selection
+      // Wait for connection state to change
+      await this.page.waitForSelector('.status-dot.connected', { timeout: 5000 });
+    }
   }
 
   async getQmkSettings() {
-    // Get all QMK setting items
-    const settings = await this.page.locator('.qmk-setting, [data-qmk-setting]').all();
+    // Get all setting control components
+    const settings = await this.page.locator('setting-control').all();
     return settings;
   }
 
   async getSettingByName(name: string) {
-    return this.page.locator(`.qmk-setting:has-text("${name}"), [data-qmk-setting="${name}"]`).first();
+    return this.page.locator(`setting-control:has(.setting-name:has-text("${name}"))`).first();
   }
 
-  async modifySettingValue(settingName: string, newValue: string | number) {
+  async modifySettingValue(settingName: string, newValue: string | number | boolean) {
     const setting = await this.getSettingByName(settingName);
-    const input = setting.locator('input, select').first();
+    const settingControl = setting.locator('.setting-control').first();
 
-    const inputType = await input.getAttribute('type');
+    // Check if it's a boolean (checkbox) or number input
+    const checkbox = setting.locator('input[type="checkbox"]');
+    const numberInput = setting.locator('input[type="number"]');
+    const rangeInput = setting.locator('input[type="range"]');
 
-    if (inputType === 'checkbox') {
-      const isChecked = await input.isChecked();
+    if (await checkbox.count() > 0) {
+      const isChecked = await checkbox.isChecked();
       if ((newValue && !isChecked) || (!newValue && isChecked)) {
-        await input.click();
+        await checkbox.click();
       }
-    } else if (await input.evaluate(el => el.tagName === 'SELECT')) {
-      await input.selectOption(String(newValue));
-    } else {
-      await input.fill(String(newValue));
+    } else if (await numberInput.count() > 0) {
+      await numberInput.fill(String(newValue));
+      // Trigger change event
+      await numberInput.dispatchEvent('change');
+    } else if (await rangeInput.count() > 0) {
+      await rangeInput.fill(String(newValue));
+      await rangeInput.dispatchEvent('input');
     }
+
+    // Wait for the setting change animation
+    await this.page.waitForTimeout(600);
   }
 
   async getSettingValue(settingName: string): Promise<string | boolean | null> {
     const setting = await this.getSettingByName(settingName);
-    const input = setting.locator('input, select').first();
 
-    const inputType = await input.getAttribute('type');
+    const checkbox = setting.locator('input[type="checkbox"]');
+    const numberInput = setting.locator('input[type="number"]');
+    const valueDisplay = setting.locator('.current-value');
 
-    if (inputType === 'checkbox') {
-      return await input.isChecked();
-    } else if (await input.evaluate(el => el.tagName === 'SELECT')) {
-      return await input.inputValue();
-    } else {
-      return await input.inputValue();
+    if (await checkbox.count() > 0) {
+      return await checkbox.isChecked();
+    } else if (await numberInput.count() > 0) {
+      return await numberInput.inputValue();
+    } else if (await valueDisplay.count() > 0) {
+      const text = await valueDisplay.innerText();
+      // Remove unit suffix if present
+      return text.replace(/[a-z]+$/i, '').trim();
     }
+
+    return null;
   }
 
-  async isSettingsVisible() {
-    return await this.page.locator('#menu-content, .settings-panel').isVisible();
+  async saveSettings() {
+    const saveButton = this.page.locator('button.btn-save');
+    await saveButton.click();
+    // Wait for save to complete
+    await this.page.waitForTimeout(1000);
   }
 
-  async hasChangedIndicator(settingName: string) {
-    const setting = await this.getSettingByName(settingName);
-    return await setting.locator('.changed, .modified').count() > 0;
+  async revertSettings() {
+    const revertButton = this.page.locator('button.btn-revert');
+    await revertButton.click();
+    // Wait for revert to complete
+    await this.page.waitForTimeout(500);
+  }
+
+  async toggleInstantMode() {
+    const instantModeCheckbox = this.page.locator('#instant-mode');
+    await instantModeCheckbox.click();
+    await this.page.waitForTimeout(200);
+  }
+
+  async isInstantModeEnabled(): Promise<boolean> {
+    const instantModeCheckbox = this.page.locator('#instant-mode');
+    return await instantModeCheckbox.isChecked();
+  }
+
+  async hasUnsavedChanges(): Promise<boolean> {
+    // Check if the status indicator shows unsaved changes
+    const indicator = this.page.locator('.status-indicator.has-changes');
+    return await indicator.isVisible();
   }
 }
+
+// Mock WebUSB for testing
+test.beforeEach(async ({ page }) => {
+  // Mock the WebUSB API
+  await page.addInitScript(() => {
+    // Create mock USB device
+    const mockDevice = {
+      vendorId: 0x1234,
+      productId: 0x5678,
+      productName: 'Test Keyboard',
+      manufacturerName: 'Test Manufacturer',
+      serialNumber: '12345',
+      opened: false,
+      configuration: {
+        interfaces: [{
+          interfaceNumber: 0,
+          alternates: [{
+            interfaceClass: 0x03, // HID
+            endpoints: [
+              { direction: 'in', endpointNumber: 1 },
+              { direction: 'out', endpointNumber: 2 }
+            ]
+          }]
+        }]
+      },
+      open: async function() { this.opened = true; return Promise.resolve(); },
+      close: async function() { this.opened = false; return Promise.resolve(); },
+      selectConfiguration: async () => Promise.resolve(),
+      claimInterface: async () => Promise.resolve(),
+      releaseInterface: async () => Promise.resolve(),
+      transferIn: async () => Promise.resolve({
+        status: 'ok',
+        data: new DataView(new ArrayBuffer(64))
+      }),
+      transferOut: async () => Promise.resolve({
+        status: 'ok',
+        bytesWritten: 64
+      })
+    };
+
+    // Mock navigator.usb
+    (window.navigator as any).usb = {
+      getDevices: async () => [],
+      requestDevice: async () => mockDevice
+    };
+
+    // Mark USB as supported
+    console.log('WebUSB mock initialized');
+  });
+});
 
 test.describe('Settings/QMK Functionality', () => {
   let settingsPage: SettingsPage;
@@ -79,121 +169,144 @@ test.describe('Settings/QMK Functionality', () => {
     await settingsPage.open();
   });
 
-  test('should open settings panel', async ({ page }) => {
-    await settingsPage.openSettingsMenu();
+  test('should display the application UI', async ({ page }) => {
+    // Check that main UI elements are present
+    await expect(page.locator('.keybard-app')).toBeVisible();
+    await expect(page.locator('.app-header')).toBeVisible();
+    await expect(page.locator('connection-status')).toBeVisible();
+    await expect(page.locator('settings-list')).toBeVisible();
 
-    // Verify settings panel is visible
-    const isVisible = await settingsPage.isSettingsVisible();
-    expect(isVisible).toBe(true);
+    // Check WebUSB support indicator
+    const usbSupport = page.locator('#usb-support');
+    await expect(usbSupport).toContainText('Supported');
+  });
 
-    // Check that QMK settings section exists
-    const qmkSection = page.locator('text=/QMK Settings/i, text=/Settings/i').first();
-    await expect(qmkSection).toBeVisible();
+  test('should connect to a mock device', async ({ page }) => {
+    // Check initial disconnected state
+    const statusDot = page.locator('.status-dot');
+    await expect(statusDot).toHaveClass(/disconnected/);
+
+    // Click connect button
+    const connectButton = page.locator('button.btn-connect');
+    await expect(connectButton).toBeVisible();
+    await connectButton.click();
+
+    // Should show connecting state briefly
+    await expect(statusDot).toHaveClass(/connecting/);
+
+    // Should eventually show connected
+    await expect(statusDot).toHaveClass(/connected/, { timeout: 5000 });
+
+    // Device info should be displayed
+    await expect(page.locator('.device-info')).toBeVisible();
+    await expect(page.locator('.device-detail-value').first()).toContainText('Test Manufacturer');
   });
 
   test('should display QMK settings', async ({ page }) => {
-    await settingsPage.openSettingsMenu();
+    // Settings should be loaded (from mock data in SettingsStore)
+    await page.waitForSelector('setting-control', { timeout: 5000 });
 
-    // Get all QMK settings
     const settings = await settingsPage.getQmkSettings();
-
-    // Should have at least some settings
     expect(settings.length).toBeGreaterThan(0);
 
-    // Common QMK settings that should exist
-    const expectedSettings = [
-      'Tapping Term',
-      'Tapping Toggle',
-      'Permissive Hold'
-    ];
+    // Check for specific settings categories
+    await expect(page.locator('.category-title:has-text("Tapping")')).toBeVisible();
+    await expect(page.locator('.category-title:has-text("Mouse Keys")')).toBeVisible();
 
-    for (const settingName of expectedSettings) {
-      const setting = await settingsPage.getSettingByName(settingName);
-      const exists = await setting.count() > 0;
-
-      if (exists) {
-        await expect(setting).toBeVisible();
-      }
-    }
+    // Check for specific settings
+    const tappingTerm = await settingsPage.getSettingByName('Tapping Term');
+    await expect(tappingTerm).toBeVisible();
   });
 
   test('should modify a QMK setting value', async ({ page }) => {
-    await settingsPage.openSettingsMenu();
+    // Wait for settings to load
+    await page.waitForSelector('setting-control', { timeout: 5000 });
 
-    // Try to find and modify Tapping Term (common numeric setting)
-    const tappingTermSetting = await settingsPage.getSettingByName('Tapping Term');
-    const exists = await tappingTermSetting.count() > 0;
+    // Modify Tapping Term
+    const initialValue = await settingsPage.getSettingValue('Tapping Term');
+    expect(initialValue).toBeTruthy();
 
-    if (exists) {
-      // Get original value
-      const originalValue = await settingsPage.getSettingValue('Tapping Term');
+    const newValue = 250;
+    await settingsPage.modifySettingValue('Tapping Term', newValue);
 
-      // Modify the value
-      const newValue = 200;
-      await settingsPage.modifySettingValue('Tapping Term', newValue);
+    // Verify the value changed
+    const updatedValue = await settingsPage.getSettingValue('Tapping Term');
+    expect(updatedValue).toBe(String(newValue));
 
-      // Verify the value changed
-      const currentValue = await settingsPage.getSettingValue('Tapping Term');
-      expect(currentValue).toBe(String(newValue));
-
-      // Check for changed indicator (if instant mode is off)
-      const hasChanged = await settingsPage.hasChangedIndicator('Tapping Term');
-      // This might be true or false depending on instant mode
-    }
+    // Should show unsaved changes indicator
+    await expect(page.locator('.status-indicator.has-changes')).toBeVisible();
   });
 
-  test('should reflect changes in the UI', async ({ page }) => {
-    await settingsPage.openSettingsMenu();
+  test('should handle boolean settings', async ({ page }) => {
+    // Wait for settings to load
+    await page.waitForSelector('setting-control', { timeout: 5000 });
 
-    // Find a checkbox setting (e.g., Permissive Hold)
-    const permissiveHoldSetting = await settingsPage.getSettingByName('Permissive Hold');
-    const exists = await permissiveHoldSetting.count() > 0;
+    // Toggle Permissive Hold
+    const initialValue = await settingsPage.getSettingValue('Permissive Hold');
+    expect(typeof initialValue).toBe('boolean');
 
-    if (exists) {
-      // Get original value
-      const originalValue = await settingsPage.getSettingValue('Permissive Hold');
+    await settingsPage.modifySettingValue('Permissive Hold', !initialValue);
 
-      // Toggle the value
-      await settingsPage.modifySettingValue('Permissive Hold', !originalValue);
-
-      // Verify the UI updated
-      const newValue = await settingsPage.getSettingValue('Permissive Hold');
-      expect(newValue).toBe(!originalValue);
-
-      // The checkbox should be in the opposite state
-      const checkbox = permissiveHoldSetting.locator('input[type="checkbox"]').first();
-      const isChecked = await checkbox.isChecked();
-      expect(isChecked).toBe(!originalValue);
-    }
+    const updatedValue = await settingsPage.getSettingValue('Permissive Hold');
+    expect(updatedValue).toBe(!initialValue);
   });
 
   test('should handle instant vs queued mode', async ({ page }) => {
-    await settingsPage.openSettingsMenu();
+    // Wait for settings to load
+    await page.waitForSelector('setting-control', { timeout: 5000 });
 
-    // Check if instant mode toggle exists
-    const instantToggle = page.locator('text=/Instant/i, [data-setting="instant"]').first();
-    const hasInstantToggle = await instantToggle.count() > 0;
+    // Check initial instant mode state
+    const initialInstantMode = await settingsPage.isInstantModeEnabled();
+    expect(typeof initialInstantMode).toBe('boolean');
 
-    if (hasInstantToggle) {
-      // Get current instant mode state
-      const instantCheckbox = instantToggle.locator('input[type="checkbox"]').first();
-      const isInstant = await instantCheckbox.isChecked();
-
-      // Modify a setting
-      const tappingTermSetting = await settingsPage.getSettingByName('Tapping Term');
-      if (await tappingTermSetting.count() > 0) {
-        await settingsPage.modifySettingValue('Tapping Term', 250);
-
-        // Check for changed indicator based on mode
-        const hasChanged = await settingsPage.hasChangedIndicator('Tapping Term');
-
-        if (!isInstant) {
-          // In queued mode, should show changed indicator
-          // Check for commit button
-          const commitButton = page.locator('button:has-text("Commit"), button:has-text("Apply")').first();
-          await expect(commitButton).toBeVisible();
-        }
-      }
+    // Make a change in queued mode
+    if (initialInstantMode) {
+      await settingsPage.toggleInstantMode();
     }
+
+    await settingsPage.modifySettingValue('Tapping Term', 300);
+
+    // Should show unsaved changes
+    await expect(page.locator('.status-indicator.has-changes')).toBeVisible();
+
+    // Save button should be enabled
+    const saveButton = page.locator('button.btn-save');
+    await expect(saveButton).not.toBeDisabled();
+
+    // Switch to instant mode
+    await settingsPage.toggleInstantMode();
+
+    // Make another change
+    await settingsPage.modifySettingValue('Combo Term', 100);
+
+    // In instant mode, changes should auto-save (no unsaved indicator after a moment)
+    await page.waitForTimeout(1000);
+
+    // Note: In real implementation, instant mode would immediately save
+    // For now, the UI just tracks the mode
+  });
+
+  test('should revert unsaved changes', async ({ page }) => {
+    // Wait for settings to load
+    await page.waitForSelector('setting-control', { timeout: 5000 });
+
+    // Get initial value
+    const initialValue = await settingsPage.getSettingValue('Tapping Term');
+
+    // Make a change
+    await settingsPage.modifySettingValue('Tapping Term', 350);
+
+    // Verify change indicator appears
+    await expect(page.locator('.status-indicator.has-changes')).toBeVisible();
+
+    // Click revert
+    await settingsPage.revertSettings();
+
+    // Value should be restored
+    const revertedValue = await settingsPage.getSettingValue('Tapping Term');
+    expect(revertedValue).toBe(initialValue);
+
+    // Change indicator should disappear
+    await expect(page.locator('.status-indicator.has-changes')).not.toBeVisible();
   });
 });
