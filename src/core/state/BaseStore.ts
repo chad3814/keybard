@@ -2,7 +2,7 @@
  * Base MobX store class with common functionality
  */
 
-import { makeObservable, observable, action, computed, toJS } from 'mobx';
+import { observable, action, computed, toJS } from 'mobx';
 import { EventBus, EventType } from '../events/EventBus';
 
 export interface StoreState {
@@ -19,11 +19,11 @@ export interface HistoryEntry<T> {
  * Abstract base class for MobX stores
  */
 export abstract class BaseStore<T extends StoreState = StoreState> {
-  protected state: T;
-  protected history: HistoryEntry<T>[] = [];
-  protected historyIndex = -1;
+  @observable protected state: T;
+  @observable protected history: HistoryEntry<T>[] = [];
+  @observable protected historyIndex = -1;
   protected maxHistorySize = 50;
-  public isDirty = false;
+  @observable public isDirty = false;
 
   protected eventBus: EventBus;
   protected storeName: string;
@@ -32,8 +32,6 @@ export abstract class BaseStore<T extends StoreState = StoreState> {
     this.state = initialState;
     this.storeName = storeName;
     this.eventBus = EventBus.getInstance();
-
-    makeObservable(this);
 
     // Add initial state to history
     this.addToHistory('init');
