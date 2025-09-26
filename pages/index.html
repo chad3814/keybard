@@ -13,6 +13,7 @@
     <link rel="stylesheet" type="text/css" href="css/keys.css" />
     <link rel="stylesheet" type="text/css" href="css/mainboard.css" />
     <link rel="stylesheet" type="text/css" href="css/sampleboards.css" />
+    <link rel="stylesheet" type="text/css" href="css/coloris.css" />
 
     <!-- Basic libraries -->
 <script type="text/javascript" src="js/util.js"></script>
@@ -85,6 +86,9 @@
 
 <!-- Handy tools -->
 <script type="text/javascript" src="js/tools.js"></script>
+
+<!-- Color picker -->
+<script type="text/javascript" src="js/coloris.js"></script>
 
 <!-- Main to tie it all together. -->
 <script type="text/javascript" src="js/main.js"></script>
@@ -234,6 +238,7 @@
           </label>
         </label>
       </div>
+      <div id="layer-color"><input id="layer-color-input" data-coloris /></div>
     </div>
     <div id="mainboard"></div>
   </div>
@@ -1285,17 +1290,37 @@
     </div>
     <div id="tiptip">
       <div class="tip">
-  <h3>TypeBind</h3>
+  <h3>Layer names</h3>
   <p>
-    Did you know: While normally you click a key in your keyboard, then a key
-    in the example boards to bind it to - you can use your keyboard to bind
-    it to a key! Enable "Typing binds a key" in the menu, then click a key
-    to assign to, then just type the key on your keyboard!
+    Did you know: You can assign cosmetic names to your layers in Keybard!
+    These are in-memory, and saved in your .kbi file on download, so other apps
+    such as vial will not recognize or show layer names.
   </p>
   <p>
-    Bonus: works exceptionally well with Serial Assignment!
+    To rename a layer, r-click its number in the layer selection tab, and
+    enter its name! To clear, just submit an empty string at the prompt.
   </p>
-  <img src="images/tip-typebind.png" style="width: 300px;"/>
+  <img src="images/tip-layername.png" style="width: 400px;"/>
+</div>
+<div class="tip">
+  <h3>Printing layer maps</h3>
+  <p>
+    Did you know: While the default UI is annoying to print, Keybard has a
+    "print" option in the menu that opens a new window with all your
+    non-empty layers. You can remove them at will, and print out an easy
+    reference sheet!
+  </p>
+  <img src="images/tip-print.png" style="width: 500px;"/>
+</div>
+<div class="tip">
+  <h3>Serial Assignment</h3>
+  <p>
+    Did you know: You don't have to click each key one by one to assign to
+    them. Select a serial assignment method under MENU-&gt; Serial Assignment,
+    and select a key. When it's bound to a new key, the active key to select
+    jumps to the next in its series.
+  </p>
+  <img src="images/tip-serial.png" style="width: 60vw; height: 30vh;"/>
 </div>
 <div class="tip">
   <h3>Quick actions for keys</h3>
@@ -1316,37 +1341,17 @@
   <img src="images/tip-contextmenu.png" style="width: 300px;"/>
 </div>
 <div class="tip">
-  <h3>Printing layer maps</h3>
+  <h3>TypeBind</h3>
   <p>
-    Did you know: While the default UI is annoying to print, Keybard has a
-    "print" option in the menu that opens a new window with all your
-    non-empty layers. You can remove them at will, and print out an easy
-    reference sheet!
-  </p>
-  <img src="images/tip-print.png" style="width: 500px;"/>
-</div>
-<div class="tip">
-  <h3>Layer names</h3>
-  <p>
-    Did you know: You can assign cosmetic names to your layers in Keybard!
-    These are in-memory, and saved in your .kbi file on download, so other apps
-    such as vial will not recognize or show layer names.
+    Did you know: While normally you click a key in your keyboard, then a key
+    in the example boards to bind it to - you can use your keyboard to bind
+    it to a key! Enable "Typing binds a key" in the menu, then click a key
+    to assign to, then just type the key on your keyboard!
   </p>
   <p>
-    To rename a layer, r-click its number in the layer selection tab, and
-    enter its name! To clear, just submit an empty string at the prompt.
+    Bonus: works exceptionally well with Serial Assignment!
   </p>
-  <img src="images/tip-layername.png" style="width: 400px;"/>
-</div>
-<div class="tip">
-  <h3>Serial Assignment</h3>
-  <p>
-    Did you know: You don't have to click each key one by one to assign to
-    them. Select a serial assignment method under MENU-&gt; Serial Assignment,
-    and select a key. When it's bound to a new key, the active key to select
-    jumps to the next in its series.
-  </p>
-  <img src="images/tip-serial.png" style="width: 60vw; height: 30vh;"/>
+  <img src="images/tip-typebind.png" style="width: 300px;"/>
 </div>
 
     </div>
