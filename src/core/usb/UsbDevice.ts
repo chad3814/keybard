@@ -310,12 +310,27 @@ export class UsbDevice {
       // QMK/Vial keyboards expose vendor-specific interfaces (0xFF) for WebUSB
       // We cannot use HID interfaces (0x03) as they are protected by WebUSB
       const interfaces = device.configuration?.interfaces ?? [];
+
+      // Debug: Log available interfaces
+      console.log('Available USB interfaces:');
+      interfaces.forEach((iface, idx) => {
+        iface.alternates.forEach(alt => {
+          console.log(`  Interface ${idx} (${iface.interfaceNumber}): class=0x${alt.interfaceClass.toString(16).padStart(2, '0')} (${
+            alt.interfaceClass === 0x03 ? 'HID - PROTECTED' :
+            alt.interfaceClass === 0xFF ? 'Vendor-Specific' :
+            alt.interfaceClass === 0x00 ? 'None' :
+            'Other'
+          }), subclass=${alt.interfaceSubclass}, protocol=${alt.interfaceProtocol}`);
+        });
+      });
+
       let targetInterface: USBInterface | undefined;
 
       // First, try to find vendor-specific interface (0xFF)
       for (const iface of interfaces) {
         for (const alt of iface.alternates) {
           if (alt.interfaceClass === 0xFF) { // Vendor-specific class
+            console.log(`Found vendor-specific interface: ${iface.interfaceNumber}`);
             targetInterface = iface;
             break;
           }
@@ -325,10 +340,12 @@ export class UsbDevice {
 
       // If no vendor-specific interface, try other non-HID interfaces
       if (!targetInterface) {
+        console.log('No vendor-specific interface found, looking for non-HID interfaces...');
         for (const iface of interfaces) {
           for (const alt of iface.alternates) {
             // Skip HID (0x03) as it's protected
             if (alt.interfaceClass !== 0x03) {
+              console.log(`Found non-HID interface: ${iface.interfaceNumber} (class=0x${alt.interfaceClass.toString(16).padStart(2, '0')})`);
               targetInterface = iface;
               break;
             }
@@ -338,19 +355,29 @@ export class UsbDevice {
       }
 
       if (!targetInterface) {
-        return err('No suitable interface found. QMK/Vial keyboards need vendor-specific (0xFF) interfaces for WebUSB access.');
+        return err('No suitable interface found. QMK/Vial keyboards need vendor-specific (0xFF) interfaces for WebUSB access. All interfaces are either HID (protected) or unavailable.');
       }
 
       this.interfaceNumber = targetInterface.interfaceNumber;
+      console.log(`Attempting to claim interface ${this.interfaceNumber}...`);
 
       try {
         await device.claimInterface(this.interfaceNumber);
+        console.log(`Successfully claimed interface ${this.interfaceNumber}`);
       } catch (claimError) {
         // Provide helpful error message
         const errorMsg = claimError instanceof Error ? claimError.message : 'Unknown error';
+        console.error(`Failed to claim interface ${this.interfaceNumber}:`, errorMsg);
+
         if (errorMsg.includes('protected class')) {
           return err('Cannot access HID interface via WebUSB. Please ensure your keyboard firmware exposes a vendor-specific (0xFF) interface for WebUSB communication.');
         }
+
+        // Check if interface is already claimed
+        if (errorMsg.includes('Unable to claim interface')) {
+          return err(`Unable to claim interface ${this.interfaceNumber}. The interface may be in use by another application or the system. Try disconnecting and reconnecting the device.`);
+        }
+
         return err(`Failed to claim interface: ${errorMsg}`);
       }
 
