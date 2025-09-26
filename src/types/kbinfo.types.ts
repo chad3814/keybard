@@ -169,8 +169,8 @@ export const DEFAULT_KBINFO: Partial<KBINFO> = {
 export interface Change {
   type: 'key' | 'macro' | 'tapdance' | 'combo' | 'override' | 'setting';
   id: string;
-  oldValue?: any;
-  newValue?: any;
+  oldValue?: unknown;
+  newValue?: unknown;
   timestamp: number;
 }
 

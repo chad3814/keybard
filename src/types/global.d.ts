@@ -2,10 +2,8 @@
  * Global type definitions for KeyBard
  */
 
-// WebUSB types (extend if needed)
-interface Navigator {
-  usb?: USB;
-}
+// WebUSB types are provided by @types/w3c-web-usb package
+// No need to redefine Navigator interface
 
 // Global application types
 declare global {
