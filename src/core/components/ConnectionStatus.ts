@@ -21,13 +21,21 @@ export class ConnectionStatus extends BaseComponent {
   qmkService!: QmkService;
 
   @state()
-  private connectionState: ConnectionState = ConnectionState.DISCONNECTED;
+  private connectionState?: ConnectionState;
 
   @state()
-  private deviceInfo: DeviceInfo | null = null;
+  private deviceInfo?: DeviceInfo | null;
 
   @state()
-  private protocolVersion: { via: number; vial: number } | null = null;
+  private protocolVersion?: { via: number; vial: number } | null;
+
+  constructor() {
+    super();
+    // Initialize default values
+    this.connectionState = ConnectionState.DISCONNECTED;
+    this.deviceInfo = null;
+    this.protocolVersion = null;
+  }
 
   static override styles = css`
     :host {

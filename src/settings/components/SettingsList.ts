@@ -18,16 +18,25 @@ export class SettingsList extends BaseComponent {
   store!: SettingsStore;
 
   @state()
-  private settings: Record<string, QMKSetting> = {};
+  private settings?: Record<string, QMKSetting>;
 
   @state()
-  private loading = false;
+  private loading?: boolean;
 
   @state()
-  private error: string | null = null;
+  private error?: string | null;
 
   @state()
-  private hasChanges = false;
+  private hasChanges?: boolean;
+
+  constructor() {
+    super();
+    // Initialize default values
+    this.settings = {};
+    this.loading = false;
+    this.error = null;
+    this.hasChanges = false;
+  }
 
   static override styles = css`
     :host {
@@ -247,7 +256,7 @@ export class SettingsList extends BaseComponent {
   private categorizeSettings(): Map<string, QMKSetting[]> {
     const categories = new Map<string, QMKSetting[]>();
 
-    Object.values(this.settings).forEach(setting => {
+    Object.values(this.settings || {}).forEach(setting => {
       let category = 'General';
 
       if (setting.id.includes('tapping') || setting.id.includes('tap')) {
@@ -274,7 +283,7 @@ export class SettingsList extends BaseComponent {
   }
 
   override render(): TemplateResult {
-    if (this.loading && Object.keys(this.settings).length === 0) {
+    if (this.loading && Object.keys(this.settings || {}).length === 0) {
       return html`
         <div class="loading">
           Loading settings...
