@@ -89,8 +89,11 @@ export class QmkService {
    */
   @action
   public async connect(): Promise<Result<void, string>> {
+    // For HID devices, we can filter by usage page/usage or vendor/product IDs
+    // QMK/Vial keyboards typically use standard keyboard usage (page 0x01, usage 0x06)
     const result = await this.usbDevice.connect([
-      { classCode: 0x03 }, // HID devices
+      // We can add specific vendor/product filters here if needed
+      // For now, let the user choose from any available HID device
     ]);
 
     if (!result.isOk()) {
@@ -104,8 +107,8 @@ export class QmkService {
    * Disconnect from the device
    */
   @action
-  public async disconnect(): Promise<Result<void, string>> {
-    return this.usbDevice.disconnect();
+  public async disconnect(): Promise<void> {
+    await this.usbDevice.disconnect();
   }
 
   /**
@@ -282,9 +285,13 @@ export class QmkService {
     let lastError = '';
 
     for (let attempt = 0; attempt < this.config.retryAttempts; attempt++) {
-      const result = await this.usbDevice.sendAndReceive(data, this.config.timeout);
+      // Convert ArrayBuffer to Uint8Array for HID API
+      const uint8Data = new Uint8Array(data);
+      // HID reports use report ID 0 by default for raw HID
+      const result = await this.usbDevice.sendAndReceive(0, uint8Data, this.config.timeout);
       if (result.isOk()) {
-        return result;
+        // Convert response back to ArrayBuffer
+        return ok(result.value.buffer as ArrayBuffer);
       }
 
       lastError = result.error;

@@ -1,24 +1,16 @@
 /**
- * USB device connection and management
+ * HID Device communication handler
+ * Uses WebHID API for keyboard communication
  */
 
+/// <reference path="../../types/webhid.d.ts" />
+
+import { EventBus, EventType } from '../events/EventBus';
+import type { DeviceInfo } from '../protocols/base';
 import { Result, ok, err } from '@/types/index';
-import { EventBus, EventType } from '@core/events/EventBus';
-import type { DeviceInfo } from '@core/protocols/base';
 
 /**
- * USB device filter for keyboard devices
- */
-export interface UsbDeviceFilter {
-  vendorId?: number;
-  productId?: number;
-  classCode?: number;
-  subclassCode?: number;
-  protocolCode?: number;
-}
-
-/**
- * USB device connection state
+ * Connection states
  */
 export enum ConnectionState {
   DISCONNECTED = 'disconnected',
@@ -28,15 +20,23 @@ export enum ConnectionState {
 }
 
 /**
- * USB device wrapper
+ * HID device filter for requestDevice
+ */
+export interface UsbDeviceFilter {
+  vendorId?: number;
+  productId?: number;
+  usagePage?: number;
+  usage?: number;
+}
+
+/**
+ * HID Device class for WebHID communication
  */
 export class UsbDevice {
-  private device: USBDevice | null = null;
-  private inEndpoint: USBEndpoint | null = null;
-  private outEndpoint: USBEndpoint | null = null;
-  private interfaceNumber: number | null = null;
+  private device: HIDDevice | null = null;
   private state: ConnectionState = ConnectionState.DISCONNECTED;
   private eventBus: EventBus;
+  private listener: ((this: HIDDevice, ev: HIDInputReportEvent) => void) | null = null;
 
   constructor(eventBus: EventBus) {
     this.eventBus = eventBus;
@@ -50,56 +50,65 @@ export class UsbDevice {
   }
 
   /**
-   * Check if device is connected
+   * Check if connected
    */
   public isConnected(): boolean {
-    return this.state === ConnectionState.CONNECTED && this.device !== null;
+    return this.state === ConnectionState.CONNECTED;
   }
 
   /**
-   * Request and connect to a USB device
+   * Request and connect to a HID device
    */
   public async connect(filters?: UsbDeviceFilter[]): Promise<Result<DeviceInfo, string>> {
     try {
-      if (!navigator.usb) {
-        return err('WebUSB not supported in this browser');
+      if (!('hid' in navigator)) {
+        return err('WebHID not supported in this browser');
       }
 
       this.setState(ConnectionState.CONNECTING);
 
-      // Request device from user
-      const usbFilters = filters?.map(f => ({
+      // Convert filters to HID format
+      const hidFilters = filters?.map(f => ({
         vendorId: f.vendorId,
         productId: f.productId,
-        classCode: f.classCode,
-        subclassCode: f.subclassCode,
-        protocolCode: f.protocolCode,
+        usagePage: f.usagePage,
+        usage: f.usage,
       })) ?? [];
 
-      const device = await navigator.usb.requestDevice({
-        filters: usbFilters.length > 0 ? usbFilters : [
-          { classCode: 0xFF }, // Vendor-specific devices (QMK/Vial keyboards)
-          // Note: We cannot use { classCode: 0x03 } (HID) as it's protected by WebUSB
-        ],
+      // Request device from user
+      const devices = await navigator.hid.requestDevice({
+        filters: hidFilters.length > 0 ? hidFilters : [],
       });
 
-      // Open and configure device
-      const result = await this.configureDevice(device);
-      if (!result.isOk()) {
-        this.setState(ConnectionState.ERROR);
-        return err(result.error);
+      if (devices.length === 0) {
+        this.setState(ConnectionState.DISCONNECTED);
+        return err('No device selected');
+      }
+
+      const device = devices[0];
+      if (!device) {
+        this.setState(ConnectionState.DISCONNECTED);
+        return err('No device available');
+      }
+
+      // Open the device
+      if (!device.opened) {
+        await device.open();
       }
 
       this.device = device;
       this.setState(ConnectionState.CONNECTED);
 
+      // Set up input report listener
+      this.setupListener();
+
       // Get device info
       const deviceInfo: DeviceInfo = {
         vendorId: device.vendorId,
         productId: device.productId,
-        productName: device.productName ?? undefined,
-        manufacturerName: device.manufacturerName ?? undefined,
-        serialNumber: device.serialNumber ?? undefined,
+        productName: device.productName,
+        manufacturerName: undefined, // HID doesn't provide manufacturer name directly
+        serialNumber: undefined, // HID doesn't provide serial number directly
         protocolVersion: {
           via: 0, // Will be updated by protocol handler
           vial: 0,
@@ -111,15 +120,15 @@ export class UsbDevice {
         device,
         vendorId: device.vendorId,
         productId: device.productId,
-        productName: device.productName ?? undefined,
-        manufacturerName: device.manufacturerName ?? undefined,
-        serialNumber: device.serialNumber ?? undefined,
+        productName: device.productName,
       });
 
+      console.log('HID Device connected:', deviceInfo);
       return ok(deviceInfo);
     } catch (error) {
       this.setState(ConnectionState.ERROR);
       const message = error instanceof Error ? error.message : 'Failed to connect to device';
+      console.error('HID connection error:', message);
       return err(message);
     }
   }
@@ -127,25 +136,26 @@ export class UsbDevice {
   /**
    * Reconnect to a previously connected device
    */
-  public async reconnect(device: USBDevice): Promise<Result<DeviceInfo, string>> {
+  public async reconnect(device: HIDDevice): Promise<Result<DeviceInfo, string>> {
     try {
       this.setState(ConnectionState.CONNECTING);
 
-      const result = await this.configureDevice(device);
-      if (!result.isOk()) {
-        this.setState(ConnectionState.ERROR);
-        return err(result.error);
+      if (!device.opened) {
+        await device.open();
       }
 
       this.device = device;
       this.setState(ConnectionState.CONNECTED);
 
+      // Set up input report listener
+      this.setupListener();
+
       const deviceInfo: DeviceInfo = {
         vendorId: device.vendorId,
         productId: device.productId,
-        productName: device.productName ?? undefined,
-        manufacturerName: device.manufacturerName ?? undefined,
-        serialNumber: device.serialNumber ?? undefined,
+        productName: device.productName,
+        manufacturerName: undefined,
+        serialNumber: undefined,
         protocolVersion: {
           via: 0,
           vial: 0,
@@ -156,9 +166,7 @@ export class UsbDevice {
         device,
         vendorId: device.vendorId,
         productId: device.productId,
-        productName: device.productName ?? undefined,
-        manufacturerName: device.manufacturerName ?? undefined,
-        serialNumber: device.serialNumber ?? undefined,
+        productName: device.productName,
       });
 
       return ok(deviceInfo);
@@ -170,247 +178,208 @@ export class UsbDevice {
   }
 
   /**
-   * Disconnect from the device
+   * Disconnect from current device
    */
-  public async disconnect(): Promise<Result<void, string>> {
-    try {
-      if (!this.device) {
-        return ok(undefined);
+  public async disconnect(): Promise<void> {
+    if (this.device) {
+      // Remove listener
+      if (this.listener) {
+        this.device.removeEventListener('inputreport', this.listener);
+        this.listener = null;
       }
 
-      if (this.interfaceNumber !== null) {
-        await this.device.releaseInterface(this.interfaceNumber);
+      // Close device
+      if (this.device.opened) {
+        await this.device.close();
       }
-
-      await this.device.close();
 
       this.device = null;
-      this.inEndpoint = null;
-      this.outEndpoint = null;
-      this.interfaceNumber = null;
       this.setState(ConnectionState.DISCONNECTED);
-
       this.eventBus.emit(EventType.DEVICE_DISCONNECTED, {});
-
-      return ok(undefined);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to disconnect from device';
-      return err(message);
     }
   }
 
   /**
-   * Send data to the device
+   * Send report to device
    */
-  public async send(data: ArrayBuffer): Promise<Result<void, string>> {
-    if (!this.isConnected()) {
+  public async sendReport(reportId: number, data: Uint8Array): Promise<Result<void, string>> {
+    if (!this.device || !this.device.opened) {
       return err('Device not connected');
     }
 
-    if (!this.device || this.outEndpoint === null) {
-      return err('Device not properly configured');
-    }
-
     try {
-      const result = await this.device.transferOut(
-        this.outEndpoint.endpointNumber,
-        data
-      );
-
-      if (result.status !== 'ok') {
-        return err(`Transfer failed with status: ${result.status}`);
-      }
-
+      // Cast to BufferSource for HID API
+      await this.device.sendReport(reportId, data as BufferSource);
       return ok(undefined);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to send data';
+      const message = error instanceof Error ? error.message : 'Failed to send report';
       return err(message);
     }
   }
 
   /**
-   * Receive data from the device
+   * Send feature report to device
    */
-  public async receive(length: number = 64): Promise<Result<ArrayBuffer, string>> {
-    if (!this.isConnected()) {
+  public async sendFeatureReport(reportId: number, data: Uint8Array): Promise<Result<void, string>> {
+    if (!this.device || !this.device.opened) {
       return err('Device not connected');
     }
 
-    if (!this.device || this.inEndpoint === null) {
-      return err('Device not properly configured');
-    }
-
     try {
-      const result = await this.device.transferIn(
-        this.inEndpoint.endpointNumber,
-        length
-      );
-
-      if (result.status !== 'ok') {
-        return err(`Transfer failed with status: ${result.status}`);
-      }
-
-      if (!result.data) {
-        return err('No data received');
-      }
-
-      return ok(result.data.buffer.slice(0) as ArrayBuffer);
+      // Cast to BufferSource for HID API
+      await this.device.sendFeatureReport(reportId, data as BufferSource);
+      return ok(undefined);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to receive data';
+      const message = error instanceof Error ? error.message : 'Failed to send feature report';
       return err(message);
     }
   }
 
   /**
-   * Send and receive data in one operation
+   * Receive feature report from device
+   */
+  public async receiveFeatureReport(reportId: number): Promise<Result<DataView, string>> {
+    if (!this.device || !this.device.opened) {
+      return err('Device not connected');
+    }
+
+    try {
+      const report = await this.device.receiveFeatureReport(reportId);
+      return ok(report);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to receive feature report';
+      return err(message);
+    }
+  }
+
+  /**
+   * Send data and wait for response (mimics the original USB.send pattern)
    */
   public async sendAndReceive(
-    data: ArrayBuffer,
-    timeout: number = 1000
-  ): Promise<Result<ArrayBuffer, string>> {
-    const sendResult = await this.send(data);
-    if (!sendResult.isOk()) {
-      return err(sendResult.error);
+    reportId: number,
+    data: Uint8Array,
+    timeoutMs: number = 5000
+  ): Promise<Result<Uint8Array, string>> {
+    if (!this.device || !this.device.opened) {
+      return err('Device not connected');
     }
 
-    // Add small delay to allow device to process
-    await new Promise(resolve => setTimeout(resolve, 10));
+    return new Promise((resolve) => {
+      let timeoutHandle: number;
+      let responseHandler: ((this: HIDDevice, ev: HIDInputReportEvent) => void) | null = null;
 
-    const receiveResult = await this.receive();
-    if (!receiveResult.isOk()) {
-      return err(receiveResult.error);
-    }
+      // Set up response handler
+      responseHandler = (event: HIDInputReportEvent) => {
+        if (event.reportId === reportId || reportId === 0) {
+          // Clear timeout
+          clearTimeout(timeoutHandle);
 
-    return ok(receiveResult.value);
+          // Remove listener
+          if (responseHandler && this.device) {
+            this.device.removeEventListener('inputreport', responseHandler);
+          }
+
+          // Convert DataView to Uint8Array
+          const responseData = new Uint8Array(event.data.buffer);
+          resolve(ok(responseData));
+        }
+      };
+
+      // Set timeout
+      timeoutHandle = setTimeout(() => {
+        if (responseHandler && this.device) {
+          this.device.removeEventListener('inputreport', responseHandler);
+        }
+        resolve(err('Timeout waiting for response'));
+      }, timeoutMs);
+
+      // Add listener
+      this.device!.addEventListener('inputreport', responseHandler);
+
+      // Send the report
+      this.device!.sendReport(reportId, data as BufferSource)
+        .catch((error: Error) => {
+          clearTimeout(timeoutHandle);
+          if (responseHandler && this.device) {
+            this.device.removeEventListener('inputreport', responseHandler);
+          }
+          const message = error instanceof Error ? error.message : 'Failed to send report';
+          resolve(err(message));
+        });
+    });
   }
 
   /**
-   * Get list of connected USB devices
+   * Get current device
    */
-  public static async getDevices(): Promise<USBDevice[]> {
-    if (!navigator.usb) {
+  public getDevice(): HIDDevice | null {
+    return this.device;
+  }
+
+  /**
+   * Get list of connected HID devices
+   */
+  public static async getDevices(): Promise<HIDDevice[]> {
+    if (!('hid' in navigator)) {
       return [];
     }
 
-    return navigator.usb.getDevices();
+    return navigator.hid.getDevices();
   }
 
   /**
-   * Configure the USB device
+   * Set up input report listener
    */
-  private async configureDevice(device: USBDevice): Promise<Result<void, string>> {
-    try {
-      await device.open();
+  private setupListener(): void {
+    if (!this.device) return;
 
-      if (device.configuration === null) {
-        await device.selectConfiguration(1);
-      }
-
-      // Find suitable interface
-      // QMK/Vial keyboards expose vendor-specific interfaces (0xFF) for WebUSB
-      // We cannot use HID interfaces (0x03) as they are protected by WebUSB
-      const interfaces = device.configuration?.interfaces ?? [];
-
-      // Debug: Log available interfaces
-      console.log('Available USB interfaces:');
-      interfaces.forEach((iface, idx) => {
-        iface.alternates.forEach(alt => {
-          console.log(`  Interface ${idx} (${iface.interfaceNumber}): class=0x${alt.interfaceClass.toString(16).padStart(2, '0')} (${
-            alt.interfaceClass === 0x03 ? 'HID - PROTECTED' :
-            alt.interfaceClass === 0xFF ? 'Vendor-Specific' :
-            alt.interfaceClass === 0x00 ? 'None' :
-            'Other'
-          }), subclass=${alt.interfaceSubclass}, protocol=${alt.interfaceProtocol}`);
-        });
-      });
-
-      let targetInterface: USBInterface | undefined;
-
-      // First, try to find vendor-specific interface (0xFF)
-      for (const iface of interfaces) {
-        for (const alt of iface.alternates) {
-          if (alt.interfaceClass === 0xFF) { // Vendor-specific class
-            console.log(`Found vendor-specific interface: ${iface.interfaceNumber}`);
-            targetInterface = iface;
-            break;
-          }
-        }
-        if (targetInterface) break;
-      }
-
-      // If no vendor-specific interface, try other non-HID interfaces
-      if (!targetInterface) {
-        console.log('No vendor-specific interface found, looking for non-HID interfaces...');
-        for (const iface of interfaces) {
-          for (const alt of iface.alternates) {
-            // Skip HID (0x03) as it's protected
-            if (alt.interfaceClass !== 0x03) {
-              console.log(`Found non-HID interface: ${iface.interfaceNumber} (class=0x${alt.interfaceClass.toString(16).padStart(2, '0')})`);
-              targetInterface = iface;
-              break;
-            }
-          }
-          if (targetInterface) break;
-        }
-      }
-
-      if (!targetInterface) {
-        return err('No suitable interface found. QMK/Vial keyboards need vendor-specific (0xFF) interfaces for WebUSB access. All interfaces are either HID (protected) or unavailable.');
-      }
-
-      this.interfaceNumber = targetInterface.interfaceNumber;
-      console.log(`Attempting to claim interface ${this.interfaceNumber}...`);
-
-      try {
-        await device.claimInterface(this.interfaceNumber);
-        console.log(`Successfully claimed interface ${this.interfaceNumber}`);
-      } catch (claimError) {
-        // Provide helpful error message
-        const errorMsg = claimError instanceof Error ? claimError.message : 'Unknown error';
-        console.error(`Failed to claim interface ${this.interfaceNumber}:`, errorMsg);
-
-        if (errorMsg.includes('protected class')) {
-          return err('Cannot access HID interface via WebUSB. Please ensure your keyboard firmware exposes a vendor-specific (0xFF) interface for WebUSB communication.');
-        }
-
-        // Check if interface is already claimed
-        if (errorMsg.includes('Unable to claim interface')) {
-          return err(`Unable to claim interface ${this.interfaceNumber}. The interface may be in use by another application or the system. Try disconnecting and reconnecting the device.`);
-        }
-
-        return err(`Failed to claim interface: ${errorMsg}`);
-      }
-
-      // Find endpoints
-      const alternate = targetInterface.alternates[0];
-      if (!alternate) {
-        return err('No alternate interface found');
-      }
-
-      for (const endpoint of alternate.endpoints) {
-        if (endpoint.direction === 'in') {
-          this.inEndpoint = endpoint;
-        } else if (endpoint.direction === 'out') {
-          this.outEndpoint = endpoint;
-        }
-      }
-
-      if (!this.inEndpoint || !this.outEndpoint) {
-        return err('Required endpoints not found');
-      }
-
-      return ok(undefined);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to configure device';
-      return err(message);
+    // Remove old listener if exists
+    if (this.listener) {
+      this.device.removeEventListener('inputreport', this.listener);
     }
+
+    // Create new listener
+    this.listener = (event: HIDInputReportEvent) => {
+      // Emit raw data event (add DATA_RECEIVED to EventType if needed)
+      // For now, we'll just handle it internally
+      // this.eventBus.emit(EventType.DATA_RECEIVED, {
+      //   reportId: event.reportId,
+      //   data: new Uint8Array(event.data.buffer),
+      // });
+    };
+
+    // Add listener
+    this.device.addEventListener('inputreport', this.listener);
   }
 
   /**
-   * Set connection state and emit event
+   * Update connection state
    */
   private setState(state: ConnectionState): void {
     this.state = state;
     this.eventBus.emit(EventType.CONNECTION_STATE_CHANGED, { state });
+  }
+
+  /**
+   * Check for existing connections
+   */
+  public async checkExistingConnection(): Promise<Result<DeviceInfo | null, string>> {
+    try {
+      const devices = await UsbDevice.getDevices();
+
+      if (devices.length > 0 && devices[0]) {
+        // Try to reconnect to the first available device
+        const device = devices[0];
+        const result = await this.reconnect(device);
+        if (result.isOk()) {
+          return ok(result.value);
+        }
+      }
+
+      return ok(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to check existing connections';
+      return err(message);
+    }
   }
 }

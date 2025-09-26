@@ -237,19 +237,19 @@ class KeyBardApp {
   }
 
   /**
-   * Check WebUSB support
+   * Check WebHID support
    */
   private checkUSBSupport(): void {
     const statusElement = document.getElementById('usb-support');
     if (!statusElement) return;
 
-    if ('usb' in navigator) {
+    if ('hid' in navigator) {
       statusElement.textContent = 'Supported ✅';
       statusElement.className = 'supported';
     } else {
       statusElement.textContent = 'Not Supported ❌';
       statusElement.className = 'not-supported';
-      this.showError('WebUSB is not supported in this browser. Please use Chrome, Edge, or Opera.');
+      this.showError('WebHID is not supported in this browser. Please use Chrome, Edge, or Opera.');
     }
   }
 

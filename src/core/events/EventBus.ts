@@ -38,7 +38,7 @@ export enum EventType {
 
 // Event payload interfaces
 export interface DeviceConnectedPayload {
-  device: USBDevice;
+  device: HIDDevice;
   vendorId: number;
   productId: number;
   productName?: string;
