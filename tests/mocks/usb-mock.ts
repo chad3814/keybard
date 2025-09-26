@@ -59,7 +59,7 @@ export class MockVialKeyboard implements MockUSBDevice {
     ];
 
     for (let i = 0; i < qwertyKeys.length && i < 60; i++) {
-      this.keymap[0][i] = qwertyKeys[i];
+      this.keymap[0]![i] = qwertyKeys[i]!;
     }
   }
 
@@ -126,18 +126,18 @@ export class MockVialKeyboard implements MockUSBDevice {
 
       case 0x04: // Get Keycode
         // Return keycode from our mock keymap
-        const layer = setup.value! & 0xFF;
-        const row = (setup.value! >> 8) & 0xFF;
-        const col = (setup.value! >> 16) & 0xFF;
+        const layer = (setup.value || 0) & 0xFF;
+        const row = ((setup.value || 0) >> 8) & 0xFF;
+        const col = ((setup.value || 0) >> 16) & 0xFF;
         const keyIndex = row * 6 + col;
 
-        if (layer < this.keymap.length && keyIndex < this.keymap[layer].length) {
-          view.setUint16(0, this.keymap[layer][keyIndex], true);
+        if (layer < this.keymap.length && keyIndex < this.keymap[layer]!.length) {
+          view.setUint16(0, this.keymap[layer]![keyIndex]!, true);
         }
         break;
 
       case 0x05: // Get QMK Setting
-        const settingId = setup.value!;
+        const settingId = setup.value || 0;
         const settingKey = this.getSettingKeyById(settingId);
 
         if (settingKey && this.settings.has(settingKey)) {
@@ -176,19 +176,19 @@ export class MockVialKeyboard implements MockUSBDevice {
 
     switch (request) {
       case 0x07: // Set Keycode
-        const layer = setup.value! & 0xFF;
-        const row = (setup.value! >> 8) & 0xFF;
-        const col = (setup.value! >> 16) & 0xFF;
+        const layer = (setup.value || 0) & 0xFF;
+        const row = ((setup.value || 0) >> 8) & 0xFF;
+        const col = ((setup.value || 0) >> 16) & 0xFF;
         const keyIndex = row * 6 + col;
         const keycode = view.getUint16(0, true);
 
-        if (layer < this.keymap.length && keyIndex < this.keymap[layer].length) {
-          this.keymap[layer][keyIndex] = keycode;
+        if (layer < this.keymap.length && keyIndex < this.keymap[layer]!.length) {
+          this.keymap[layer]![keyIndex] = keycode;
         }
         break;
 
       case 0x08: // Set QMK Setting
-        const settingId = setup.value!;
+        const settingId = setup.value || 0;
         const settingKey = this.getSettingKeyById(settingId);
         const settingValue = view.getUint16(0, true);
 
@@ -238,7 +238,7 @@ export class MockUSB {
   async requestDevice(options?: USBDeviceRequestOptions): Promise<USBDevice> {
     // Simulate user selecting the first available device
     if (this.devices.length > 0) {
-      this.pairedDevice = this.devices[0];
+      this.pairedDevice = this.devices[0] || null;
       return this.pairedDevice as unknown as USBDevice;
     }
 
