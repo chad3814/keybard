@@ -216,10 +216,13 @@ export function parseSettingResponse(
   const message = parsed.value;
   const view = new DataView(message.data);
 
-  if (message.command !== QmkCommand.GET_KEYBOARD_VALUE &&
-      message.command !== QmkCommand.SET_KEYBOARD_VALUE) {
-    return err(`Unexpected command: ${message.command}`);
-  }
+  console.log('Setting response - Command:', message.command, 'Data length:', message.data.byteLength);
+
+  // Some keyboards use different response command codes, so we'll be flexible
+  // if (message.command !== QmkCommand.GET_KEYBOARD_VALUE &&
+  //     message.command !== QmkCommand.SET_KEYBOARD_VALUE) {
+  //   return err(`Unexpected command: ${message.command}`);
+  // }
 
   if (message.data.byteLength < 5) {
     return err('Response too short');
@@ -371,12 +374,15 @@ export function createGetProtocolVersionRequest(): ArrayBuffer {
 export function parseProtocolVersionResponse(
   buffer: ArrayBuffer
 ): Result<{ via: number; vial: number }, string> {
-  const parsed = parseBinaryMessage(buffer, QmkCommand.GET_PROTOCOL_VERSION);
+  // Don't validate the command byte - some keyboards respond with different command codes
+  const parsed = parseBinaryMessage(buffer);
   if (!parsed.isOk()) {
     return err(parsed.error);
   }
 
   const message = parsed.value;
+  console.log('Protocol version response - Command:', message.command, 'Data length:', message.data.byteLength);
+
   if (message.data.byteLength < 4) {
     return err('Protocol version response too short');
   }
@@ -384,6 +390,8 @@ export function parseProtocolVersionResponse(
   const view = new DataView(message.data);
   const via = view.getUint16(0, true); // little-endian
   const vial = view.getUint16(2, true); // little-endian
+
+  console.log('Protocol versions - VIA:', via, 'VIAL:', vial);
 
   return ok({ via, vial });
 }

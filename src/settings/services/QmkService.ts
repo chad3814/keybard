@@ -261,6 +261,7 @@ export class QmkService {
   /**
    * Get protocol version from device
    */
+  @action
   private async getProtocolVersion(): Promise<Result<{ via: number; vial: number }, string>> {
     const request = createGetProtocolVersionRequest();
 

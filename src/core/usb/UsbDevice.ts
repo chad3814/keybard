@@ -264,12 +264,25 @@ export class UsbDevice {
       return err('Device not connected');
     }
 
+    console.log('HID sendAndReceive:', {
+      reportId,
+      dataLength: data.length,
+      data: Array.from(data.slice(0, 10)), // First 10 bytes for debugging
+      timeout: timeoutMs
+    });
+
     return new Promise((resolve) => {
       let timeoutHandle: number;
       let responseHandler: ((this: HIDDevice, ev: HIDInputReportEvent) => void) | null = null;
 
       // Set up response handler
       responseHandler = (event: HIDInputReportEvent) => {
+        console.log('HID input report received:', {
+          reportId: event.reportId,
+          dataLength: event.data.byteLength,
+          data: Array.from(new Uint8Array(event.data.buffer).slice(0, 10))
+        });
+
         if (event.reportId === reportId || reportId === 0) {
           // Clear timeout
           clearTimeout(timeoutHandle);
@@ -281,12 +294,14 @@ export class UsbDevice {
 
           // Convert DataView to Uint8Array
           const responseData = new Uint8Array(event.data.buffer);
+          console.log('HID response matched, returning data');
           resolve(ok(responseData));
         }
       };
 
       // Set timeout
       timeoutHandle = setTimeout(() => {
+        console.error('HID timeout - no response received within', timeoutMs, 'ms');
         if (responseHandler && this.device) {
           this.device.removeEventListener('inputreport', responseHandler);
         }
@@ -297,8 +312,13 @@ export class UsbDevice {
       this.device!.addEventListener('inputreport', responseHandler);
 
       // Send the report
+      console.log('Sending HID report...');
       this.device!.sendReport(reportId, data as BufferSource)
+        .then(() => {
+          console.log('HID report sent successfully, waiting for response...');
+        })
         .catch((error: Error) => {
+          console.error('Failed to send HID report:', error);
           clearTimeout(timeoutHandle);
           if (responseHandler && this.device) {
             this.device.removeEventListener('inputreport', responseHandler);

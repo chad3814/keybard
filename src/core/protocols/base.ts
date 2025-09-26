@@ -107,6 +107,9 @@ export function parseBinaryMessage(
   const view = new DataView(buffer);
   const command = view.getUint8(0);
 
+  console.log('Parsing response - Command:', command, 'Expected:', expectedCommand, 'Buffer size:', buffer.byteLength);
+  console.log('First 10 bytes:', Array.from(new Uint8Array(buffer).slice(0, 10)));
+
   if (expectedCommand !== undefined && command !== expectedCommand) {
     return err(`Expected command ${expectedCommand}, got ${command}`);
   }
@@ -124,13 +127,22 @@ export function parseBinaryMessage(
  * Serialize message to binary
  */
 export function serializeMessage(message: USBRequest): ArrayBuffer {
+  // QMK/Vial raw HID expects 32 byte packets
+  const RAW_HID_PACKET_SIZE = 32;
+
   const headerSize = 1; // command byte
   const valueSize = message.value !== undefined ? 4 : 0;
   const indexSize = message.index !== undefined ? 4 : 0;
   const dataSize = message.data ? message.data.byteLength : 0;
 
-  const buffer = new ArrayBuffer(headerSize + valueSize + indexSize + dataSize);
+  // Create buffer with fixed size for raw HID
+  const buffer = new ArrayBuffer(RAW_HID_PACKET_SIZE);
   const view = new DataView(buffer);
+  const uint8View = new Uint8Array(buffer);
+
+  // Initialize buffer with zeros
+  uint8View.fill(0);
+
   let offset = 0;
 
   // Write command
@@ -150,10 +162,11 @@ export function serializeMessage(message: USBRequest): ArrayBuffer {
   }
 
   // Write data if present
-  if (message.data) {
+  if (message.data && offset < RAW_HID_PACKET_SIZE) {
     const dataView = new Uint8Array(buffer, offset);
     const sourceView = new Uint8Array(message.data);
-    dataView.set(sourceView);
+    const copySize = Math.min(sourceView.length, RAW_HID_PACKET_SIZE - offset);
+    dataView.set(sourceView.subarray(0, copySize));
   }
 
   return buffer;
