@@ -8,6 +8,7 @@ export enum EventType {
   DEVICE_CONNECTED = 'device:connected',
   DEVICE_DISCONNECTED = 'device:disconnected',
   DEVICE_ERROR = 'device:error',
+  CONNECTION_STATE_CHANGED = 'connection:state:changed',
 
   // State events
   STATE_CHANGED = 'state:changed',
@@ -49,6 +50,10 @@ export interface DeviceDisconnectedPayload {
   reason?: string;
 }
 
+export interface ConnectionStateChangedPayload {
+  state: string;
+}
+
 export interface DeviceErrorPayload {
   error: Error;
   operation?: string;
@@ -86,6 +91,7 @@ export interface EventPayloadMap {
   [EventType.DEVICE_CONNECTED]: DeviceConnectedPayload;
   [EventType.DEVICE_DISCONNECTED]: DeviceDisconnectedPayload;
   [EventType.DEVICE_ERROR]: DeviceErrorPayload;
+  [EventType.CONNECTION_STATE_CHANGED]: ConnectionStateChangedPayload;
   [EventType.STATE_CHANGED]: StateChangedPayload;
   [EventType.STATE_COMMITTED]: void;
   [EventType.STATE_REVERTED]: void;
