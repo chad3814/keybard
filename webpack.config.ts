@@ -65,7 +65,7 @@ const config = (env: any, argv: { mode: string }): Configuration => {
       compress: true,
       port: 8080,
       hot: true,
-      open: true,
+      open: { app: { name: 'Google Chrome' } }, // set to true to opne the default browser or false to not open a browser
       historyApiFallback: true,
       proxy: [
         {
