@@ -1,2 +1,5 @@
 __pycache__
 attic
+node_modules
+dist
+.DS_Store

@@ -1,0 +1,36 @@
+{
+  "name": "keybard",
+  "version": "1.0.0",
+  "description": "KeyBard is a companion software to the Svalboard (https://svalboard.com)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chad3814/keybard.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/chad3814/keybard/issues"
+  },
+  "homepage": "https://github.com/chad3814/keybard#readme",
+  "devDependencies": {
+    "@types/react": "^19.1.15",
+    "@types/react-dom": "^19.1.9",
+    "@types/w3c-web-hid": "^1.0.6",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "xz-decompress": "^0.2.3"
+  }
+}

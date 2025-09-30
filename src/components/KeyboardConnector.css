@@ -1,0 +1,94 @@
+.keyboard-connector {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.connection-status {
+  margin-bottom: 2rem;
+}
+
+.connection-status h2 {
+  margin-top: 0;
+  color: #333;
+}
+
+.status {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0.5rem 0;
+}
+
+.status.connected {
+  color: #22c55e;
+}
+
+.status.disconnected {
+  color: #ef4444;
+}
+
+.connection-actions {
+  margin-bottom: 2rem;
+}
+
+.connection-actions button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.connection-actions button:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.connection-actions button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.error-message {
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+
+.error-message p {
+  margin: 0;
+  color: #991b1b;
+}
+
+.keyboard-info {
+  border-top: 2px solid #e5e7eb;
+  padding-top: 2rem;
+}
+
+.keyboard-info h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.keyboard-info dl {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 0.75rem 1rem;
+  margin: 0;
+}
+
+.keyboard-info dt {
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.keyboard-info dd {
+  margin: 0;
+  color: #111827;
+  font-family: 'Courier New', monospace;
+}
