@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useVial } from '../contexts/VialContext';
+import { QMKSettings } from './QMKSettings';
 import './KeyboardConnector.css';
 
 const KeyboardConnector: React.FC = () => {
@@ -100,6 +101,8 @@ const KeyboardConnector: React.FC = () => {
               </>
             )}
           </dl>
+
+          {keyboard.settings && <QMKSettings keyboard={keyboard} />}
         </div>
       )}
     </div>

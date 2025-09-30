@@ -11,10 +11,12 @@ export interface KeyboardInfo {
   custom_keycodes?: CustomKeycode[];
   keymap?: string[][];
   macros?: MacroData;
+  macro_count?: number;
+  macros_size?: number;
   combos?: ComboData;
   tapdance?: TapdanceData;
   key_overrides?: KeyOverrideData;
-  qmk?: QMKSettings;
+  settings?: Record<number, number>;
 }
 
 export interface KeyboardPayload {
@@ -24,7 +26,7 @@ export interface KeyboardPayload {
   };
   customKeycodes?: CustomKeycode[];
   layouts?: Record<string, KeyLayout>;
-  lighting?: any;
+  lighting?: unknown;
 }
 
 export interface KeyLayout {
@@ -105,9 +107,8 @@ export interface KeyOverrideEntry {
   options: number;
 }
 
-export interface QMKSettings {
-  [key: string]: any;
-}
+// Removed: QMKSettings interface (conflicted with qmk.d.ts)
+// Keyboard settings values are now stored as Record<number, number> in KeyboardInfo.settings
 
 export interface USBSendOptions {
   uint8?: boolean;

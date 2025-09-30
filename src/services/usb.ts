@@ -44,7 +44,11 @@ export class VialUSB {
   static readonly CMD_VIAL_UNLOCK_START = 0x06;
   static readonly CMD_VIAL_UNLOCK_POLL = 0x07;
   static readonly CMD_VIAL_LOCK = 0x08;
-  static readonly CMD_VIAL_DYNAMIC_ENTRY_OP = 0x0e;
+  static readonly CMD_VIAL_QMK_SETTINGS_QUERY = 0x09;
+  static readonly CMD_VIAL_QMK_SETTINGS_GET = 0x0a;
+  static readonly CMD_VIAL_QMK_SETTINGS_SET = 0x0b;
+  static readonly CMD_VIAL_QMK_SETTINGS_RESET = 0x0c;
+  static readonly CMD_VIAL_DYNAMIC_ENTRY_OP = 0x0d;
 
   static readonly DYNAMIC_VIAL_GET_NUMBER_OF_ENTRIES = 0x00;
   static readonly DYNAMIC_VIAL_TAP_DANCE_GET = 0x01;
@@ -95,11 +99,23 @@ export class VialUSB {
     this.device.addEventListener("inputreport", handleEvent);
   }
 
+  // Overload signatures for send()
+  async send(cmd: number, args: number[], options: USBSendOptions & { unpack: string; index: number }): Promise<number | bigint>;
+  async send(cmd: number, args: number[], options: USBSendOptions & { unpack: string; index?: undefined }): Promise<(number | bigint)[]>;
+  async send(cmd: number, args: number[], options: USBSendOptions & { uint8: true; index: number }): Promise<number>;
+  async send(cmd: number, args: number[], options: USBSendOptions & { uint8: true; index?: undefined }): Promise<Uint8Array>;
+  async send(cmd: number, args: number[], options: USBSendOptions & { uint16: true; index: number }): Promise<number>;
+  async send(cmd: number, args: number[], options: USBSendOptions & { uint16: true; index?: undefined }): Promise<Uint16Array>;
+  async send(cmd: number, args: number[], options: USBSendOptions & { uint32: true; index: number }): Promise<number>;
+  async send(cmd: number, args: number[], options: USBSendOptions & { uint32: true; index?: undefined }): Promise<Uint32Array>;
+  async send(cmd: number, args: number[], options?: USBSendOptions): Promise<Uint8Array>;
+
+  // Implementation
   async send(
     cmd: number,
     args: number[],
     options: USBSendOptions = {}
-  ): Promise<any> {
+  ): Promise<Uint8Array | Uint16Array | Uint32Array | number | bigint | (number | bigint)[]> {
     if (!this.device) throw new Error("USB device not connected");
 
     const message = new Uint8Array(MSG_LEN);
@@ -117,20 +133,49 @@ export class VialUSB {
     });
   }
 
+  // Overload signatures for sendVial()
+  async sendVial(cmd: number, args: number[], options: USBSendOptions & { unpack: string; index: number }): Promise<number | bigint>;
+  async sendVial(cmd: number, args: number[], options: USBSendOptions & { unpack: string; index?: undefined }): Promise<(number | bigint)[]>;
+  async sendVial(cmd: number, args: number[], options: USBSendOptions & { uint8: true; index: number }): Promise<number>;
+  async sendVial(cmd: number, args: number[], options: USBSendOptions & { uint8: true; index?: undefined }): Promise<Uint8Array>;
+  async sendVial(cmd: number, args: number[], options: USBSendOptions & { uint16: true; index: number }): Promise<number>;
+  async sendVial(cmd: number, args: number[], options: USBSendOptions & { uint16: true; index?: undefined }): Promise<Uint16Array>;
+  async sendVial(cmd: number, args: number[], options: USBSendOptions & { uint32: true; index: number }): Promise<number>;
+  async sendVial(cmd: number, args: number[], options: USBSendOptions & { uint32: true; index?: undefined }): Promise<Uint32Array>;
+  async sendVial(cmd: number, args: number[], options?: USBSendOptions): Promise<Uint8Array>;
+
+  // Implementation
   async sendVial(
     cmd: number,
     args: number[],
     options: USBSendOptions = {}
-  ): Promise<any> {
+  ): Promise<Uint8Array | Uint16Array | Uint32Array | number | bigint | (number | bigint)[]> {
     return this.send(VialUSB.CMD_VIA_VIAL_PREFIX, [cmd, ...args], options);
   }
 
-  private parseResponse(data: ArrayBuffer, options: USBSendOptions): any {
+  // Overload signatures for type safety
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions & { unpack: string; index: number }): number | bigint;
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions & { unpack: string; index?: undefined }): (number | bigint)[];
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions & { uint8: true; index: number }): number;
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions & { uint8: true; index?: undefined }): Uint8Array;
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions & { uint16: true; index: number }): number;
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions & { uint16: true; index?: undefined }): Uint16Array;
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions & { uint32: true; index: number }): number;
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions & { uint32: true; index?: undefined }): Uint32Array;
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions): Uint8Array;
+
+  // Implementation signature
+  private parseResponse(data: ArrayBuffer, options: USBSendOptions): Uint8Array | Uint16Array | Uint32Array | number | bigint | (number | bigint)[] {
     const dv = new DataView(data);
     const u8 = new Uint8Array(data);
 
     if (options.unpack) {
-      return this.unpackData(dv, options.unpack);
+      const unpacked = this.unpackData(dv, options.unpack);
+      // If index is specified, return just that element
+      if (options.index !== undefined) {
+        return unpacked[options.index];
+      }
+      return unpacked;
     }
 
     if (options.uint8) {
@@ -142,20 +187,30 @@ export class VialUSB {
     }
 
     if (options.uint16) {
-      const idx = options.index ?? 0;
-      return dv.getUint16(idx, !options.bigendian);
+      // If index is specified, return single uint16; otherwise return array
+      if (options.index !== undefined) {
+        return dv.getUint16(options.index, !options.bigendian);
+      }
+      // Return array of uint16 values
+      const u16Array = new Uint16Array(data);
+      return u16Array;
     }
 
     if (options.uint32) {
-      const idx = options.index ?? 0;
-      return dv.getUint32(idx, !options.bigendian);
+      // If index is specified, return single uint32; otherwise return array
+      if (options.index !== undefined) {
+        return dv.getUint32(options.index, !options.bigendian);
+      }
+      // Return array of uint32 values
+      const u32Array = new Uint32Array(data);
+      return u32Array;
     }
 
     return u8;
   }
 
-  private unpackData(dv: DataView, format: string): any[] {
-    const results: any[] = [];
+  private unpackData(dv: DataView, format: string): (number | bigint)[] {
+    const results: (number | bigint)[] = [];
     let offset = 0;
     let littleEndian = true;
 
@@ -238,12 +293,24 @@ export class VialUSB {
     }
   }
 
+  // Overload signatures for getDynamicEntries()
+  async getDynamicEntries(dynamicCmd: number, count: number, options: USBSendOptions & { unpack: string; index: number }): Promise<(number | bigint)[]>;
+  async getDynamicEntries(dynamicCmd: number, count: number, options: USBSendOptions & { unpack: string; index?: undefined }): Promise<(number | bigint)[][]>;
+  async getDynamicEntries(dynamicCmd: number, count: number, options: USBSendOptions & { uint8: true; index: number }): Promise<number[]>;
+  async getDynamicEntries(dynamicCmd: number, count: number, options: USBSendOptions & { uint8: true; index?: undefined }): Promise<Uint8Array[]>;
+  async getDynamicEntries(dynamicCmd: number, count: number, options: USBSendOptions & { uint16: true; index: number }): Promise<number[]>;
+  async getDynamicEntries(dynamicCmd: number, count: number, options: USBSendOptions & { uint16: true; index?: undefined }): Promise<Uint16Array[]>;
+  async getDynamicEntries(dynamicCmd: number, count: number, options: USBSendOptions & { uint32: true; index: number }): Promise<number[]>;
+  async getDynamicEntries(dynamicCmd: number, count: number, options: USBSendOptions & { uint32: true; index?: undefined }): Promise<Uint32Array[]>;
+  async getDynamicEntries(dynamicCmd: number, count: number, options?: USBSendOptions): Promise<Uint8Array[]>;
+
+  // Implementation
   async getDynamicEntries(
     dynamicCmd: number,
     count: number,
-    options: USBSendOptions
-  ): Promise<any[]> {
-    const entries: any[] = [];
+    options: USBSendOptions = {}
+  ): Promise<(Uint8Array | Uint16Array | Uint32Array | number | bigint | (number | bigint)[])[]> {
+    const entries: (Uint8Array | Uint16Array | Uint32Array | number | bigint | (number | bigint)[])[] = [];
     for (let i = 0; i < count; i++) {
       const data = await this.sendVial(
         VialUSB.CMD_VIAL_DYNAMIC_ENTRY_OP,

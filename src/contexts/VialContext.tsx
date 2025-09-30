@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { vialService } from '../services/vial.service';
+import { qmkService } from '../services/qmk.service';
 import { usbInstance } from '../services/usb';
 import type { KeyboardInfo } from '../types/vial.types';
 
@@ -57,6 +58,14 @@ export const VialProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       await vialService.init(kbinfo);
       const loadedInfo = await vialService.load(kbinfo);
+
+      // Load QMK settings
+      try {
+        await qmkService.get(loadedInfo);
+      } catch (error) {
+        console.warn('Failed to load QMK settings:', error);
+      }
+
       setKeyboard(loadedInfo);
     } catch (error) {
       console.error('Failed to load keyboard:', error);

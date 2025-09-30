@@ -72,7 +72,7 @@ export class VialService {
     kbinfo.via_proto = await this.usb.send(VialUSB.CMD_VIA_GET_PROTOCOL_VERSION, [], {
       unpack: 'B>H',
       index: 1,
-    });
+    }) as number;
 
     // Vial protocol and Keyboard ID
     const vial_kbid = await this.usb.sendVial(VialUSB.CMD_VIAL_GET_KEYBOARD_ID, [], {
@@ -123,16 +123,16 @@ export class VialService {
     // Get feature counts
     await this.usb.sendVial(VialUSB.CMD_VIAL_DYNAMIC_ENTRY_OP, []);
 
-    const macro_count = await this.usb.send(VialUSB.CMD_VIA_MACRO_GET_COUNT, [], { index: 1 });
+    const macro_count = await this.usb.send(VialUSB.CMD_VIA_MACRO_GET_COUNT, [], { uint8: true, index: 1 });
 
     const macros_size = await this.usb.send(VialUSB.CMD_VIA_MACRO_GET_BUFFER_SIZE, [], {
       unpack: 'B>H',
       index: 1,
-    });
+    }) as number;
 
     // Store feature information in kbinfo
-    (kbinfo as any).macro_count = macro_count;
-    (kbinfo as any).macros_size = macros_size;
+    kbinfo.macro_count = macro_count;
+    kbinfo.macros_size = macros_size;
   }
 
   async getKeyMap(kbinfo: KeyboardInfo): Promise<void> {
