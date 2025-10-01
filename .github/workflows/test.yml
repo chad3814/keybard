@@ -1,0 +1,141 @@
+name: Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.x, 24.x]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests with coverage
+      run: npm run test:coverage
+
+    - name: Upload coverage to Codecov
+      if: matrix.node-version == '24.x'
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage/coverage-final.json
+        flags: unittests
+        name: codecov-keybard
+        fail_ci_if_error: false
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Generate coverage report
+      if: matrix.node-version == '24.x'
+      run: |
+        echo "## Test Coverage Report 📊" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        npx vitest run --coverage --reporter=verbose 2>/dev/null | grep -A 10 "Coverage report" || true
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+    - name: Comment PR with coverage
+      if: github.event_name == 'pull_request' && matrix.node-version == '24.x'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          // Read coverage summary
+          let coverageText = '## ✅ Test Coverage Report\n\n';
+
+          try {
+            const coveragePath = path.join(process.cwd(), 'coverage', 'coverage-summary.json');
+            if (fs.existsSync(coveragePath)) {
+              const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+              const total = coverage.total;
+
+              coverageText += '| Metric | Coverage | Threshold |\n';
+              coverageText += '|--------|----------|----------|\n';
+              coverageText += `| Lines | ${total.lines.pct.toFixed(2)}% | 90% |\n`;
+              coverageText += `| Statements | ${total.statements.pct.toFixed(2)}% | 90% |\n`;
+              coverageText += `| Functions | ${total.functions.pct.toFixed(2)}% | 90% |\n`;
+              coverageText += `| Branches | ${total.branches.pct.toFixed(2)}% | 90% |\n`;
+
+              // Check if coverage meets threshold
+              const meetsThreshold =
+                total.lines.pct >= 90 &&
+                total.statements.pct >= 90 &&
+                total.functions.pct >= 90 &&
+                total.branches.pct >= 90;
+
+              if (!meetsThreshold) {
+                coverageText = '## ⚠️ Test Coverage Below Threshold\n\n' + coverageText.substring(28);
+                coverageText += '\n**Coverage must be at least 90% to pass.**';
+              }
+            } else {
+              coverageText += 'Coverage report not found.';
+            }
+          } catch (error) {
+            coverageText += `Error reading coverage: ${error.message}`;
+          }
+
+          // Find and update or create comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' && comment.body.includes('Test Coverage Report')
+          );
+
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: coverageText
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: coverageText
+            });
+          }
+
+    - name: Check coverage thresholds
+      if: matrix.node-version == '24.x'
+      run: |
+        COVERAGE_OUTPUT=$(npx vitest run --coverage 2>&1)
+        if echo "$COVERAGE_OUTPUT" | grep -q "Coverage threshold not met"; then
+          echo "❌ Coverage is below the required 90% threshold"
+          exit 1
+        else
+          echo "✅ Coverage meets the required threshold"
+        fi
