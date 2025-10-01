@@ -18,7 +18,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        node-version: [22.x, 24.x]
 
     steps:
     - name: Checkout code
@@ -39,7 +39,7 @@ jobs:
       run: npm run test:coverage
 
     - name: Upload coverage to Codecov
-      if: matrix.node-version == '20.x'
+      if: matrix.node-version == '24.x'
       uses: codecov/codecov-action@v4
       with:
         files: ./coverage/coverage-final.json
@@ -50,7 +50,7 @@ jobs:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Generate coverage report
-      if: matrix.node-version == '20.x'
+      if: matrix.node-version == '24.x'
       run: |
         echo "## Test Coverage Report 📊" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -61,7 +61,7 @@ jobs:
         echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
     - name: Comment PR with coverage
-      if: github.event_name == 'pull_request' && matrix.node-version == '20.x'
+      if: github.event_name == 'pull_request' && matrix.node-version == '24.x'
       uses: actions/github-script@v7
       with:
         script: |
@@ -130,7 +130,7 @@ jobs:
           }
 
     - name: Check coverage thresholds
-      if: matrix.node-version == '20.x'
+      if: matrix.node-version == '24.x'
       run: |
         COVERAGE_OUTPUT=$(npx vitest run --coverage 2>&1)
         if echo "$COVERAGE_OUTPUT" | grep -q "Coverage threshold not met"; then
