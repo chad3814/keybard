@@ -1,10 +1,14 @@
 # KeyBard - Vite + React + TypeScript Setup
 
+[![Test Coverage](https://img.shields.io/codecov/c/github/chad3814/keybard?style=flat-square&label=coverage)](https://codecov.io/gh/chad3814/keybard)
+[![Tests](https://img.shields.io/github/actions/workflow/status/chad3814/keybard/test.yml?branch=main&style=flat-square&label=tests)](https://github.com/chad3814/keybard/actions/workflows/test.yml)
+
 Quick reference for the new Vite-based UI alongside the original Python setup.
 
 ## Quick Start
 
 ### Original Setup (Unchanged)
+
 ```bash
 source .venv/bin/activate
 python devserver.py
@@ -12,6 +16,7 @@ python devserver.py
 ```
 
 ### New Vite Setup
+
 ```bash
 npm install        # First time only
 npm run dev        # Development
@@ -20,7 +25,7 @@ npm run dev        # Development
 
 ## Project Structure
 
-```
+```text
 keybard/
 ├── pages/          # Original HTML/JS (untouched)
 │   ├── js/vial/   # Original Vial JS modules
@@ -89,6 +94,72 @@ function MyComponent() {
 - Macro management UI
 - Combo/tap-dance configuration
 - Additional Vial features
+
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run with coverage report
+npm run test:coverage
+
+# Run in watch mode (during development)
+npm run test:watch
+
+# Open Vitest UI
+npm run test:ui
+```
+
+### Test Coverage
+
+This project maintains **90% code coverage** across:
+
+- ✅ Utility functions and byte manipulation
+- ✅ KeyService (keycode parsing, custom keys, layers)
+- ✅ USB communication layer (mocked WebHID API)
+- ✅ VialService (keyboard loading, keymap management)
+- ✅ QMK settings service
+- ✅ React Context state management
+
+### Test Structure
+
+```text
+tests/
+├── services/       # Service layer tests
+├── contexts/       # React Context tests
+├── fixtures/       # Test data and mocks
+├── mocks/          # USB and API mocks
+└── utils/          # Test utilities
+```
+
+### Writing Tests
+
+Tests follow the AAA (Arrange-Act-Assert) pattern:
+
+```typescript
+it('should update key at specific position', async () => {
+  // Arrange
+  const layer = 0, row = 1, col = 2;
+  const keymask = 0x0004; // KC_A
+
+  // Act
+  await vialService.updateKey(layer, row, col, keymask);
+
+  // Assert
+  expect(mockUSB.send).toHaveBeenCalledWith(/* ... */);
+});
+```
+
+### CI/CD
+
+Tests run automatically on:
+
+- Pull requests (all commits)
+- Pushes to main/master
+- Coverage reports posted to PRs
 
 ## Important Notes
 

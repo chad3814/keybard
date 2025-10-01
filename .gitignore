@@ -3,3 +3,4 @@ attic
 node_modules
 dist
 .DS_Store
+coverage/
