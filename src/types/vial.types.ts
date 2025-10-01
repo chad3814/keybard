@@ -9,7 +9,7 @@ export interface KeyboardInfo {
   cols: number;
   layers?: number;
   custom_keycodes?: CustomKeycode[];
-  keymap?: string[][];
+  keymap?: number[][];
   macros?: MacroData;
   macro_count?: number;
   macros_size?: number;
@@ -17,6 +17,14 @@ export interface KeyboardInfo {
   tapdance?: TapdanceData;
   key_overrides?: KeyOverrideData;
   settings?: Record<number, number>;
+
+  // Svalboard-specific
+  sval_proto?: number;
+  sval_firmware?: string;
+  layer_colors?: Array<{ hue: number; sat: number; val: number }>;
+  cosmetic?: {
+    layer?: Record<string, string>;
+  };
 }
 
 export interface KeyboardPayload {

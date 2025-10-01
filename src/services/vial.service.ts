@@ -3,7 +3,7 @@ import { VialUSB, usbInstance } from './usb';
 import { LE32, MSG_LEN } from './utils';
 import type { KeyboardInfo } from '../types/vial.types';
 import { XzReadableStream } from 'xz-decompress';
-import { keyService } from './key.service';
+import { svalService } from './sval.service';
 
 // XZ decompression helper
 async function decompress(buffer: ArrayBuffer): Promise<string> {
@@ -50,6 +50,10 @@ export class VialService {
     this.usb = usb;
   }
 
+  static isWebHIDSupported(): boolean {
+    return 'hid' in navigator;
+  }
+
   async init(_kbinfo: KeyboardInfo): Promise<void> {
     // Initialization hook for API setup
   }
@@ -57,6 +61,16 @@ export class VialService {
   async load(kbinfo: KeyboardInfo): Promise<KeyboardInfo> {
     // Load keyboard information
     await this.getKeyboardInfo(kbinfo);
+
+    // Check for Svalboard-specific features
+    const isSval = await svalService.check(kbinfo);
+    if (isSval) {
+      console.log('Svalboard detected, proto:', kbinfo.sval_proto, 'firmware:', kbinfo.sval_firmware);
+      await svalService.pull(kbinfo);
+    }
+
+    // Set up default cosmetic layer names
+    svalService.setupCosmeticLayerNames(kbinfo);
 
     // Load features (combos, macros, etc.)
     await this.getFeatures(kbinfo);
@@ -147,6 +161,7 @@ export class VialService {
 
     const size = kbinfo.layers * kbinfo.rows * kbinfo.cols;
 
+    // Get keymap data as uint16 array (big-endian converted to host endian)
     const alldata = await this.usb.getViaBuffer(
       VialUSB.CMD_VIA_KEYMAP_GET_BUFFER,
       size * 2,
@@ -155,13 +170,19 @@ export class VialService {
 
     kbinfo.keymap = [];
 
+    // alldata is now an array of uint16 values
+    if (!Array.isArray(alldata)) {
+      throw new Error('Expected array of keycodes from getViaBuffer');
+    }
+
     for (let l = 0; l < kbinfo.layers; l++) {
-      const layer: string[] = [];
+      const layer: number[] = [];
       for (let r = 0; r < kbinfo.rows; r++) {
         for (let c = 0; c < kbinfo.cols; c++) {
           const offset = l * kbinfo.rows * kbinfo.cols + r * kbinfo.cols + c;
-          const keycode = new DataView(alldata.buffer).getUint16(offset * 2, false);
-          layer.push(keyService.stringify(keycode));
+          const keycode = alldata[offset];
+          layer.push(keycode);
+          // console.log(`Layer ${l} [${r},${c}] = 0x${keycode.toString(16).padStart(4, '0')} "${keyService.stringify(keycode)}"`);
         }
       }
       kbinfo.keymap[l] = layer;

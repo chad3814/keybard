@@ -7,7 +7,7 @@ function App() {
     <VialProvider>
       <div className="App">
         <header className="App-header">
-          <h1>KeyBard - Vite + React + TypeScript</h1>
+          <h1>KeyBard</h1>
         </header>
         <main>
           <KeyboardConnector />

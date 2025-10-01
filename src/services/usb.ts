@@ -1,5 +1,5 @@
 // USB HID communication layer for Vial protocol
-import { MSG_LEN, LE16 } from "./utils";
+import { MSG_LEN, LE16, BE16 } from "./utils";
 import type { USBSendOptions } from "../types/vial.types";
 
 export class VialUSB {
@@ -191,8 +191,20 @@ export class VialUSB {
       if (options.index !== undefined) {
         return dv.getUint16(options.index, !options.bigendian);
       }
-      // Return array of uint16 values
-      const u16Array = new Uint16Array(data);
+      // Create uint16 array
+      let u16Array = new Uint16Array(data);
+
+      // Convert from big-endian to little-endian if needed
+      if (options.bigendian) {
+        // Swap bytes for each uint16
+        u16Array = u16Array.map(num => ((num >> 8) & 0xFF) | ((num << 8) & 0xFF00));
+      }
+
+      // Apply slice if specified
+      if (options.slice !== undefined) {
+        u16Array = u16Array.slice(options.slice);
+      }
+
       return u16Array;
     }
 
@@ -246,31 +258,56 @@ export class VialUSB {
   async getViaBuffer(
     cmd: number,
     size: number,
-    options: USBSendOptions,
-    checkComplete?: (data: Uint8Array) => boolean
-  ): Promise<Uint8Array> {
-    const buffer = new Uint8Array(size);
+    options: USBSendOptions = {},
+    checkComplete?: (data: number[] | Uint8Array) => boolean
+  ): Promise<number[] | Uint8Array> {
+    const chunksize = 28;
+    const bytes = options.bytes || 1;
+    const alldata: number[] = [];
     let offset = 0;
-    let chunkOffset = 0;
 
     while (offset < size) {
-      const args = options.slice ? [...LE16(chunkOffset), 0, 0] : [];
-      const data = await this.send(cmd, args, options);
-      const chunk = new Uint8Array(data);
-      const startIdx = options.slice ?? 0;
-
-      for (let i = startIdx; i < chunk.length && offset < size; i++) {
-        buffer[offset++] = chunk[i];
+      let sz = chunksize;
+      if (sz > size - offset) {
+        sz = size - offset;
       }
 
-      if (checkComplete && checkComplete(buffer)) {
+      // Send command with big-endian offset
+      const args = [...BE16(offset), sz];
+      const data = await this.send(cmd, args, options);
+
+      // If we got less than requested, slice the data
+      if (sz < chunksize) {
+        const sliceSize = Math.floor(sz / bytes);
+        if (Array.isArray(data)) {
+          alldata.push(...data.slice(0, sliceSize));
+        } else {
+          // Convert typed array to regular array and slice
+          alldata.push(...Array.from(data).slice(0, sliceSize));
+        }
+      } else {
+        if (Array.isArray(data)) {
+          alldata.push(...data);
+        } else {
+          alldata.push(...Array.from(data));
+        }
+      }
+
+      if (checkComplete && checkComplete(alldata)) {
         break;
       }
 
-      chunkOffset += MSG_LEN - (options.slice ?? 0);
+      offset += chunksize;
     }
 
-    return buffer;
+    // If uint16 was requested, the data is already processed by send()
+    // Just return the array as-is
+    if (options.uint16) {
+      return alldata;
+    }
+
+    // Otherwise return as Uint8Array for backward compatibility
+    return new Uint8Array(alldata);
   }
 
   async pushViaBuffer(

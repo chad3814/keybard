@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { vialService } from '../services/vial.service';
+import { vialService, VialService } from '../services/vial.service';
 import { qmkService } from '../services/qmk.service';
 import { usbInstance } from '../services/usb';
 import type { KeyboardInfo } from '../types/vial.types';
@@ -7,6 +7,7 @@ import type { KeyboardInfo } from '../types/vial.types';
 interface VialContextType {
   keyboard: KeyboardInfo | null;
   isConnected: boolean;
+  isWebHIDSupported: boolean;
   connect: (filters?: HIDDeviceFilter[]) => Promise<boolean>;
   disconnect: () => Promise<void>;
   loadKeyboard: () => Promise<void>;
@@ -18,6 +19,7 @@ const VialContext = createContext<VialContextType | undefined>(undefined);
 export const VialProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [keyboard, setKeyboard] = useState<KeyboardInfo | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const isWebHIDSupported = VialService.isWebHIDSupported();
 
   const connect = useCallback(async (filters?: HIDDeviceFilter[]) => {
     try {
@@ -86,6 +88,7 @@ export const VialProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: VialContextType = {
     keyboard,
     isConnected,
+    isWebHIDSupported,
     connect,
     disconnect,
     loadKeyboard,

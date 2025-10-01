@@ -92,3 +92,46 @@
   color: #111827;
   font-family: 'Courier New', monospace;
 }
+
+.browser-not-supported {
+  background: #fef2f2;
+  border: 2px solid #dc2626;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+}
+
+.browser-not-supported h2 {
+  color: #991b1b;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.browser-not-supported .error-message {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-bottom: 1.5rem;
+  font-size: 1.1rem;
+  color: #7f1d1d;
+  font-weight: 500;
+}
+
+.browser-not-supported p {
+  color: #451a03;
+  margin: 1rem 0;
+}
+
+.browser-not-supported ul {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.browser-not-supported li {
+  padding: 0.5rem;
+  margin: 0.25rem 0;
+  background: white;
+  border-radius: 4px;
+  color: #1f2937;
+}

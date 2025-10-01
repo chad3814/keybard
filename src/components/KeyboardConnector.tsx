@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useVial } from '../contexts/VialContext';
 import { QMKSettings } from './QMKSettings';
+import { Keyboard } from './Keyboard';
 import './KeyboardConnector.css';
 
 const KeyboardConnector: React.FC = () => {
-  const { keyboard, isConnected, connect, disconnect, loadKeyboard } = useVial();
+  const { keyboard, isConnected, isWebHIDSupported, connect, disconnect, loadKeyboard } = useVial();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,24 +56,47 @@ const KeyboardConnector: React.FC = () => {
 
   return (
     <div className="keyboard-connector">
-      <div className="connection-status">
-        <h2>Connection Status</h2>
-        <p className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
-          {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
-        </p>
-      </div>
+      {!isWebHIDSupported ? (
+        <div className="browser-not-supported">
+          <h2>Browser Not Supported</h2>
+          <p className="error-message">
+            ⚠️ Your browser does not support WebHID API, which is required for connecting to your keyboard.
+          </p>
+          <p>
+            Please use one of the following browsers:
+          </p>
+          <ul>
+            <li>Google Chrome (version 89+)</li>
+            <li>Microsoft Edge (version 89+)</li>
+            <li>Opera (version 75+)</li>
+            <li>Brave</li>
+          </ul>
+          <p>
+            Note: Firefox and Safari do not currently support WebHID.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="connection-status">
+            <h2>Connection Status</h2>
+            <p className={`status ${isConnected ? 'connected' : 'disconnected'}`}>
+              {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+            </p>
+          </div>
 
-      <div className="connection-actions">
-        {!isConnected ? (
-          <button onClick={handleConnect} disabled={loading}>
-            {loading ? 'Connecting...' : 'Connect Keyboard'}
-          </button>
-        ) : (
-          <button onClick={handleDisconnect} disabled={loading}>
-            {loading ? 'Disconnecting...' : 'Disconnect'}
-          </button>
-        )}
-      </div>
+          <div className="connection-actions">
+            {!isConnected ? (
+              <button onClick={handleConnect} disabled={loading}>
+                {loading ? 'Connecting...' : 'Connect Keyboard'}
+              </button>
+            ) : (
+              <button onClick={handleDisconnect} disabled={loading}>
+                {loading ? 'Disconnecting...' : 'Disconnect'}
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {error && (
         <div className="error-message">
@@ -90,6 +114,14 @@ const KeyboardConnector: React.FC = () => {
             <dd>{keyboard.via_proto}</dd>
             <dt>Vial Protocol:</dt>
             <dd>{keyboard.vial_proto}</dd>
+            {keyboard.sval_proto !== undefined && keyboard.sval_proto > 0 && (
+              <>
+                <dt>Svalboard Protocol:</dt>
+                <dd>{keyboard.sval_proto}</dd>
+                <dt>Svalboard Firmware:</dt>
+                <dd>{keyboard.sval_firmware || 'Unknown'}</dd>
+              </>
+            )}
             <dt>Matrix Size:</dt>
             <dd>
               {keyboard.rows} rows × {keyboard.cols} cols
@@ -101,6 +133,15 @@ const KeyboardConnector: React.FC = () => {
               </>
             )}
           </dl>
+
+          {keyboard.keymap && (
+            <Keyboard
+              keyboard={keyboard}
+              onKeyClick={(layer, row, col) => {
+                console.log(`Clicked key at layer ${layer}, row ${row}, col ${col}`);
+              }}
+            />
+          )}
 
           {keyboard.settings && <QMKSettings keyboard={keyboard} />}
         </div>
